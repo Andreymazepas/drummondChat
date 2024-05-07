@@ -13,7 +13,7 @@ const predefinedUser: User = {
   password: 'admin',
 }
 
-const users: User[] = []
+//const users: User[] = []
 
 
 
