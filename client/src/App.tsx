@@ -3,23 +3,12 @@ import ChatScreen from './ChatScreen'
 import "./App.css"
 import { Logo } from './Logo'
 
-type User = {
-  username: string
-  password: string
-}
-
-const predefinedUser: User = {
-  username: 'admin',
-  password: 'admin',
-}
-
-//const users: User[] = []
-
-
 
 const App = () => {
-  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isCadastro, setIsCadastro] = useState(false)
@@ -27,22 +16,59 @@ const App = () => {
 
 
   const handleLogin = () => {
-    if (username === predefinedUser.username && password === predefinedUser.password) {
-      setError('')
-      setLoadingLogin(true)
-      setTimeout(() => {
+    setLoadingLogin(true)
+    setError('')
+    fetch('http://localhost:3000/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    })
+      .then((res) => res.json())
+      .then((data) => {
         setLoadingLogin(false)
-        setIsLoggedIn(true)
-      }, 1500);
-      //alert('Login successful!')
-    } else {
-      setError('Usuario ou senha incorretos')
-    }
+        if (data.error) {
+          setError(data.error)
+          return
+        }
+
+        if (data.token) {
+          localStorage.setItem('token', data.token)
+          setIsLoggedIn(true)
+        }
+      })
+  }
+
+  const handleCadastro = () => {
+    setLoadingLogin(true)
+    setError('')
+    fetch('http://localhost:3000/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password, name, phone })
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setLoadingLogin(false)
+        if (data.error) {
+          setError(data.error)
+          return
+        }
+
+        if (data.token) {
+          localStorage.setItem('token', data.token)
+          setIsLoggedIn(true)
+        }
+      })
   }
 
   if (isLoggedIn) {
     return <ChatScreen logout={() => {
-      setIsLoggedIn(false)
+      setIsLoggedIn(false);
+      localStorage.removeItem('token');
     }} />
   }
 
@@ -61,9 +87,9 @@ const App = () => {
               <label>Nome de usuario</label>
               <input
                 type="text"
-                placeholder="Nome de usuario"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
               <label>Senha</label>
               <input
@@ -86,28 +112,20 @@ const App = () => {
         )}
 
         {isCadastro && <div className="loginForm">
-          <label>Nome de usuario</label>
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
           <label>Email</label>
           <input
             type="text"
             placeholder="Email"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}>
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}>
 
           </input>
           <label>Nome</label>
           <input
             type="text"
             placeholder="Nome"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}>
-
+            value={name}
+            onChange={(e) => setName(e.target.value)}>
           </input>
           <label>Senha</label>
           <input
@@ -121,8 +139,15 @@ const App = () => {
             }}
             onChange={(e) => setPassword(e.target.value)}
           />
+          <label>Telefone</label>
+          <input
+            type="text"
+            placeholder="Telefone"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}>
+          </input>
           <div>
-            <button onClick={handleLogin}>Cadastrar</button>
+            <button onClick={handleCadastro}>Cadastrar</button>
             <p style={{ color: 'red' }}>{error}</p>
           </div>
         </div>}

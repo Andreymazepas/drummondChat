@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+openai_key.txt
+training_embeddings.csv
+training.csv
+training.txt

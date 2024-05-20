@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+// CORS middleware
 
 // MongoDB connection
 mongoose
@@ -22,6 +23,19 @@ const userSchema = new mongoose.Schema({
   password: String,
   isAdmin: Boolean,
   phone: String,
+});
+
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader(
+    'Access-Control-Allow-Methods',
+    'GET, POST, PUT, DELETE, OPTIONS'
+  );
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, Content-Length, X-Requested-With'
+  );
+  next();
 });
 
 const User = mongoose.model('User', userSchema);
@@ -42,7 +56,12 @@ app.post('/register', async (req, res) => {
       phone: req.body.phone,
     });
     await user.save();
-    res.status(201).json({ message: 'User registered successfully' });
+    const token = jwt.sign(
+      { userId: user._id, isAdmin: user.isAdmin },
+      'your_secret_key',
+      { expiresIn: '1h' }
+    );
+    res.status(201).json({ message: 'User registered successfully', token });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -101,6 +120,47 @@ function verifyToken(req, res, next) {
   }
 }
 
+// Get all users (requires admin privilege)
+app.get('/users', verifyToken, async (req, res) => {
+  try {
+    // Check if user making the request is an admin
+    const currentUser = await User.findById(req.userId);
+    if (!currentUser.isAdmin) {
+      return res
+        .status(403)
+        .json({ message: 'Unauthorized. Admin privileges required' });
+    }
+
+    // Retrieve all users from the database
+    const users = await User.find({}, { password: 0 });
+    res.status(200).json(users);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// delete user (requires admin privilege)
+app.delete('/users/:userId', verifyToken, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Check if user making the request is an admin
+    const currentUser = await User.findById(req.userId);
+    if (!currentUser.isAdmin) {
+      return res
+        .status(403)
+        .json({ message: 'Unauthorized. Admin privileges required' });
+    }
+
+    // Delete user from the database
+    await User.findByIdAndDelete(userId);
+
+    res.status(200).json({ message: 'User deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 app.put('/users/:userId', verifyToken, async (req, res) => {
   try {
     const { userId } = req.params;
@@ -126,8 +186,10 @@ app.put('/users/:userId', verifyToken, async (req, res) => {
 app.get('/training-text', async (req, res) => {
   try {
     // Retrieve training text from the database (assuming it's stored in a collection called 'training_text')
-    const trainingText = await TrainingText.findOne();
-    res.status(200).json(trainingText.text);
+    //const trainingText = await TrainingText.findOne();
+    const fs = require('fs');
+    const trainingText = fs.readFileSync('training.txt', 'utf8');
+    res.status(200).json(trainingText);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -148,8 +210,29 @@ app.put('/training-text', verifyToken, async (req, res) => {
 
     // Update training text in the database (assuming it's stored in a collection called 'training_text')
     await TrainingText.findOneAndUpdate({}, { text }, { upsert: true });
+    // write to training.txt
+    const fs = require('fs');
+    fs.writeFileSync('training.txt', text);
+
+    // call localhost:2024/train
+    const axios = require('axios');
+    axios.post('http://127.0.0.1:2024/train');
 
     res.status(200).json({ message: 'Training text updated successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// post question to localhost:2024/answer and get answer
+app.post('/answer', async (req, res) => {
+  try {
+    const { question } = req.body;
+    const axios = require('axios');
+    const answer = await axios.post('http://127.0.0.1:2024/answer', {
+      question,
+    });
+    res.status(200).json(answer.data);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
