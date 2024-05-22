@@ -1,3 +1,4 @@
+#coding=utf-8
 import pandas as pd
 import time
 import tiktoken
@@ -144,15 +145,17 @@ def create_context(question, df, max_len=1800, size="ada"):
     
         returns.append(row['text'])
 
-    return "\n\n###\n\n".join(returns)
-
+    return "\n###\n".join(returns)
+    
+   
 
 def answer(question):
     context = create_context(question, dataframe)
+    prompt = "Você é um assistente para o site da faculdade, seja profissional e responda as perguntas baseado no contexto abaixo, recuse educadamente caso não possa responder.{context} --- Pergunta: {question} Resposta:".format(context=context, question=question)
     try:
         response = openai.Completion.create(
-            prompt=f"Voce é um assistente para o site da faculdade, seja profissional e responda as perguntas baseado no contexto abaixo, recuse educadamente caso nao possa responder.\n\n{context}\n\n---\n\nPergunta: {question}\nResposta:",
-            temperature = 0.6,
+            prompt=prompt,
+            temperature=0.6,
             max_tokens=150,
             top_p=0.7,
             frequency_penalty=0,
