@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import './ChatScreen.css';
 import { Logo } from './Logo';
+import { decodeJwt, jwtDecrypt } from 'jose';
 
 
 type Message = {
@@ -21,15 +22,25 @@ const CHATGPT_EXAMPLES = [
 
 const Popup = ({ children }) => {
     return (
-        <div className="popup">
-            <div className="popupContent">
-                {children}
+        <>
+            <Overlay />
+            <div className="popup">
+                <div className="popupContent">
+                    {children}
+                </div>
             </div>
-        </div>
+        </>
     )
 }
 
 const baseUrl = 'http://localhost:3000'
+
+const Overlay = () => {
+    return (
+        <div className="overlay" > </div>
+
+    )
+}
 
 const TrainingText = ({ onClose }) => {
     // load training text from the /training-text api
@@ -44,6 +55,12 @@ const TrainingText = ({ onClose }) => {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         })
             .then(response => response.text())
+            // remove the quotes from the text
+            .then(text => text.replace(/"/g, ''))
+            .then(text => text.replace(/\\n/g, '\n'))
+            .then(text => text.replace(/\\t/g, '\t'))
+            .then(text => text.replace(/\\'/g, '\''))
+            // remove the
             .then(text => setText(text))
             .catch(error => console.error('Error fetching training text:', error))
     }, [])
@@ -67,18 +84,19 @@ const TrainingText = ({ onClose }) => {
     }
 
     return (
-        <div>
+        <>
             <textarea
                 value={text}
                 onChange={e => setText(e.target.value)}
-                rows={10}
-                cols={50}
+                rows={30}
+                cols={100}
+
             />
             <div>
                 <button onClick={onClose}>Cancelar</button>
                 <button onClick={submitTrainingText}>Enviar</button>
             </div>
-        </div>
+        </>
     )
 }
 
@@ -156,14 +174,16 @@ const EditUsers = ({ onClose }) => {
                         }}>
                             <span>{user.name} - ({user.email}) {user.isAdmin ? 'ADMIN' : ''}</span>
                             <div>
-                                <button onClick={() => deleteUser(user._id)}>Delete</button>
-                                <button onClick={() => toggleAdmin(user._id)}>Toggle Admin</button>
+                                <button onClick={() => deleteUser(user._id)}>Apagar</button>
+                                <button onClick={() => toggleAdmin(user._id)}>
+                                    {user.isAdmin ? 'Remover Admin' : 'Tornar Admin'}
+                                </button>
                             </div>
                         </div>
                     ))}
                 </div>
             )}
-            <button onClick={onClose}>Close</button>
+            <button onClick={onClose}>Fechar</button>
         </div>
     )
 }
@@ -171,40 +191,51 @@ const EditUsers = ({ onClose }) => {
 
 
 
-
+const initial_message = "Olá, eu sou o assistente virtual da faculdade UniDrummond. Como posso te ajudar?"
 const ChatScreen = ({ logout }: { logout: () => void }) => {
-    const [messages, setMessages] = useState<Message[]>([{ text: 'Ola', isUser: false }])
+    const [messages, setMessages] = useState<Message[]>([{ text: initial_message, isUser: false }])
     const [input, setInput] = useState('')
     const [loadingResponse, setLoadingResponse] = useState(false)
     const [showEditUsers, setShowEditUsers] = useState(false)
     const [showTrainingText, setShowTrainingText] = useState(false)
+    const [isAdmin, setIsAdmin] = useState(false)
 
-    const sendMessage = async () => {
-        if (input) {
-            setMessages([...messages, { text: input, isUser: true }])
-            setInput('')
-            setLoadingResponse(true)
+    const sendMessage = async (message?: string) => {
+        if (!message && !input) {
+            return
+        }
+        const _message = message || input || '';
+        if (_message.trim() === '') {
+            return
+        }
+        setMessages([...messages, { text: _message, isUser: true }])
+        setInput('')
+        setLoadingResponse(true)
 
-            try {
-                // call /answer api with the input
-                const response = await fetch(baseUrl + '/answer', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ question: input })
-                })
+        try {
+            // call /answer api with the input
+            const response = await fetch(baseUrl + '/answer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ question: _message })
+            })
 
-                const data = await response.json()
-                const generatedText = data.answer;
-
-                setLoadingResponse(false)
-                setMessages(prev => [...prev, { text: generatedText, isUser: false }])
-            } catch (error) {
-                console.error('Error fetching response from ChatGPT:', error)
-                setLoadingResponse(false)
-                setMessages(prev => [...prev, { text: 'Error fetching response', isUser: false }])
+            if (!response.ok) {
+                throw new Error('Error fetching response from ChatGPT')
             }
+
+            const data = await response.json()
+
+            const generatedText = data.answer;
+
+            setLoadingResponse(false)
+            setMessages(prev => [...prev, { text: generatedText, isUser: false }])
+        } catch (error) {
+            console.error('Error fetching response from server:', error)
+            setLoadingResponse(false)
+            setMessages(prev => [...prev, { text: 'Estou passando por dificuldades tecnicas', isUser: false }])
         }
     }
 
@@ -216,63 +247,79 @@ const ChatScreen = ({ logout }: { logout: () => void }) => {
         }
     }, [messages])
 
-    const isAdmin = true;
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (token === null) {
+            logout();
+        }
+        const decoded = decodeJwt(String(token));
+        if (decoded.isAdmin === true) {
+            setIsAdmin(true);
+        }
+
+
+    }, []);
+
+
 
     return (
-        <div className="chatScreen">
-            {showEditUsers && <Popup><EditUsers onClose={() => setShowEditUsers(false)} /></Popup>}
+        <>
             {showTrainingText && <Popup><TrainingText onClose={() => setShowTrainingText(false)} /></Popup>}
-            <div className="chatContainer">
-                <div className="chatHeader">
-                    <div className="logoContainer">
-                        <Logo />
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center" }}>
-                        {isAdmin && (
-                            <div style={{ display: "flex" }}>
-                                <button onClick={() => setShowEditUsers(true)}>Edit Users</button>
-                                <button onClick={() => setShowTrainingText(true)}>Training Text</button>
-                            </div>
-                        )}
-                        <a onClick={logout}>Sair</a>
-                    </div>
-                </div>
-                <div className="chatMessages">
-                    {messages.map((message, index) => (
-                        <div id={index === messages.length - 1 ? 'lastMessage' : ''}
-                            className={`chatBubble ${message.isUser ? 'chatColor2' : 'chatColor1'}`} key={index}>
-                            {message.text}
+            {showEditUsers && <Popup><EditUsers onClose={() => setShowEditUsers(false)} /></Popup>}
+
+            <div className={`chatScreen ${showEditUsers || showTrainingText ? 'popupOpen' : ''} `}>
+
+                <div className="chatContainer">
+                    <div className="chatHeader">
+                        <div className="logoContainer">
+                            <Logo />
                         </div>
-                    ))}
-                    {loadingResponse && <div className="loading"></div>}
-                </div>
-                <div>
-                    <div className="suggestions">
-                        {CHATGPT_EXAMPLES.map((example, index) => (
-                            <button className="suggestion" key={index} onClick={() => {
-                                setInput(example)
-                                setTimeout(() => sendMessage(), 500)
-                            }}>{example}</button>
-                        ))}
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                            {isAdmin && (
+                                <div style={{ display: "flex" }}>
+                                    <button onClick={() => setShowEditUsers(true)}>Editar usuarios</button>
+                                    <button onClick={() => setShowTrainingText(true)}>Texto de treinamento</button>
+                                </div>
+                            )}
+                            <a onClick={logout} style={{ cursor: "pointer" }}>Sair</a>
+                        </div>
                     </div>
-                    <div className="chatInput">
-                        <input
-                            className="messageInput"
-                            type="text"
-                            placeholder="Type a message"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    sendMessage()
-                                }
-                            }}
-                        />
-                        <button className="sendButton" onClick={sendMessage}>Enviar</button>
+                    <div className="chatMessages">
+                        {messages.map((message, index) => (
+                            <div id={index === messages.length - 1 ? 'lastMessage' : ''}
+                                className={`chatBubble ${message.isUser ? 'chatColor2' : 'chatColor1'}`} key={index}>
+                                {message.text}
+                            </div>
+                        ))}
+                        {loadingResponse && <div className="loading"></div>}
+                    </div>
+                    <div>
+                        <div className="suggestions">
+                            {CHATGPT_EXAMPLES.map((example, index) => (
+                                <button className="suggestion" key={index} onClick={() => {
+                                    sendMessage(example)
+                                }}>{example}</button>
+                            ))}
+                        </div>
+                        <div className="chatInput">
+                            <input
+                                className="messageInput"
+                                type="text"
+                                placeholder="Type a message"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        sendMessage()
+                                    }
+                                }}
+                            />
+                            <button className="sendButton" onClick={sendMessage}>Enviar</button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </>
     )
 }
 

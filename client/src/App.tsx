@@ -35,6 +35,7 @@ const App = () => {
 
         if (data.token) {
           localStorage.setItem('token', data.token)
+
           setIsLoggedIn(true)
         }
       })

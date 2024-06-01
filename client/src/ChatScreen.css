@@ -1,3 +1,5 @@
+
+
 .loading::after {
   display: inline-block;
   animation: dotty steps(1, end) 1s infinite;
@@ -149,10 +151,26 @@
   border-radius: 10px;
   box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.2);
   min-width: 80%;
+  z-index: 101;
 }
 
 .popupContent {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  filter: blur(2px);
+  z-index: 100;
+}
+
+.popupOpen {
+  filter: blur(2px);
 }

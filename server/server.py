@@ -145,7 +145,7 @@ def create_context(question, df, max_len=1800, size="ada"):
     
         returns.append(row['text'])
 
-    return "\n###\n".join(returns)
+    return "\n\n###\n\n".join(returns)
     
    
 
@@ -155,9 +155,9 @@ def answer(question):
     try:
         response = openai.Completion.create(
             prompt=prompt,
-            temperature=0.6,
-            max_tokens=150,
-            top_p=0.7,
+            temperature=0.4,
+            max_tokens=256,
+            top_p=0.5,
             frequency_penalty=0,
             presence_penalty=0,
             stop=['###'],
